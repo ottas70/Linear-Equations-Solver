@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <thread>
 
 matrix::matrix(size_t row, size_t column, std::unique_ptr<double[]> matrix){
     rows = row;
@@ -17,6 +18,10 @@ double matrix::operator()(size_t i, size_t j) const{
     return data[i * cols + j];
 }
 
+double matrix::getRhs(int row) const {
+    return (*this)(row,cols-1);
+}
+
 void matrix::printMatrix(std::ostream& stream) const {
     for (int i = 0; i < rows; ++i) {
         stream << "[";
@@ -29,21 +34,48 @@ void matrix::printMatrix(std::ostream& stream) const {
 
 void matrix::solveMatrix() {
     gaussElimination();
-    if(rank() != rankOfExtendedMatrix()){
-        std::cout << "Matrix does not have a solution";
+
+    int rankOfMatrix = rank(cols-1);
+    int rankOfExtendedMatrix = rank(cols);
+
+    if(rankOfMatrix != rankOfExtendedMatrix){
+        std::cout << "Matrix does not have a solution\n";
         return;
     }
 
-    if(cols-1 - rank() != 0){
+    if(cols-1 - rankOfMatrix != 0){
         std::cout << "Infinite number of solutions" << "\n";
         std::cout << "With particular solution: ";
         countOneSolution();
-        countKernel();
+        countKernel(cols - 1 - rankOfMatrix);
         return;
     }
 
     calculateValues();
 }
+
+void matrix::solveMatrixConcurrent() {
+    gaussEliminationConcurrent();
+
+    int rankOfMatrix = rank(cols-1);
+    int rankOfExtendedMatrix = rank(cols);
+
+    if(rankOfMatrix != rankOfExtendedMatrix){
+        std::cout << "Matrix does not have a solution\n";
+        return;
+    }
+
+    if(cols-1 - rankOfMatrix != 0){
+        std::cout << "Infinite number of solutions" << "\n";
+        std::cout << "With particular solution: ";
+        countOneSolution();
+        countKernel(cols - 1 - rankOfMatrix);
+        return;
+    }
+
+    calculateValues();
+}
+
 
 void matrix::gaussElimination() {
     //projdu všechny sloupce kromě pravé strany
@@ -52,35 +84,79 @@ void matrix::gaussElimination() {
         //pro každý řádek zařídím nuly pod pivotem
         for (int rowIndex = currentCol + 1; rowIndex <  rows; ++rowIndex) {
 
-            double koeficient = 0;
-            for (int colIndex = currentCol; colIndex < cols - 1; ++colIndex) {
-                if((*this)(currentCol,colIndex) == 0){
-                    continue;
-                }else{
-                    koeficient = -((*this)(rowIndex,colIndex)/(*this)(currentCol,colIndex));
-                    break;
-                }
-            }
+            double koeficient = countKoeficient(currentCol,rowIndex);
 
             if(koeficient == 0){
                 continue;
             }
 
-            //projdu celý řádek a odeču od něho ten horní
-            for (int colIndex = currentCol; colIndex < cols ; ++colIndex) {
-                double& firstNum = (*this)(rowIndex,colIndex);
-                double secondNum = (*this)(currentCol, colIndex);
-                firstNum += secondNum*koeficient;
-            }
+            //projdu celý řádek a odečtu od něho ten horní
+            multiplyAndSubstractRows(currentCol, rowIndex, koeficient);
 
         }
 
     }
 
-    std::cout << "\nAfter Gauss:\n";
-    printMatrix(std::cout);
-    std::cout << "\n";
+    //std::cout << "\nAfter Gauss:\n";
+    //printMatrix(std::cout);
+    //std::cout << "\n";
 
+}
+
+void matrix::threadFunc(int col, int row){
+    double koeficient = countKoeficient(col,row);
+
+    if(koeficient == 0){
+        return;
+    }
+
+    multiplyAndSubstractRows(col, row, koeficient);
+}
+
+void matrix::gaussEliminationConcurrent() {
+    //projdu všechny sloupce kromě pravé strany
+    for (int currentCol = 0; currentCol < cols - 1; ++currentCol) {
+
+        std::vector<std::thread> threads;
+
+        //pro každý řádek zařídím nuly pod pivotem
+        for (int rowIndex = currentCol + 1; rowIndex <  rows; ++rowIndex) {
+
+            threads.emplace_back(&matrix::threadFunc, this, currentCol,rowIndex);
+
+        }
+
+        for (auto& thread : threads) {
+            thread.join();
+        }
+        threads.clear();
+
+    }
+
+    //std::cout << "\nAfter Concurrent Gauss:\n";
+    //printMatrix(std::cout);
+    //std::cout << "\n";
+}
+
+double matrix::countKoeficient(int column, int row) const {
+    for (int colIndex = column; colIndex < cols - 1; ++colIndex) {
+        if((*this)(column,colIndex) == 0){
+            continue;
+        }else{
+            return -((*this)(row,colIndex)/(*this)(column,colIndex));
+        }
+    }
+
+    return 0;
+
+}
+
+void matrix::multiplyAndSubstractRows(int startColumn, int row, double koeficient){
+    for (int colIndex = startColumn; colIndex < cols ; ++colIndex) {
+        double& firstNum = (*this)(row,colIndex);
+        double secondNum = (*this)(startColumn, colIndex);
+        firstNum += secondNum*koeficient;
+    }
 }
 
 void matrix::calculateValues() {
@@ -89,14 +165,9 @@ void matrix::calculateValues() {
     //počítám od posledního řádku(rovnice)
     for (int rowIndex = rows - 1; rowIndex >= 0; --rowIndex) {
 
-        double rhs = (*this)(rowIndex,cols-1);
+        double rhs = getRhs(rowIndex);
 
-        double leftSideSum = 0;
-        for (int i = cols - 2; i > rowIndex; --i) {
-            leftSideSum += (*this)(rowIndex, i)*results.at(cols-2-i);
-        }
-
-        results.push_back((rhs-leftSideSum)/(*this)(rowIndex,rowIndex));
+        solveLinearEquation(rowIndex,rowIndex,rhs,results);
 
     }
 
@@ -106,52 +177,17 @@ void matrix::calculateValues() {
     for(double d : results){
         std::cout << " " << d << " ";
     }
-    std::cout << ")";
+    std::cout << ")\n";
 
 }
 
-void matrix::swapRows(int firstRow, int secondRow) {
-
-    for (int i = 0; i <= cols-1 ; i++)
-    {
-        double temp = (*this)(firstRow,i);
-        (*this)(firstRow,i) = (*this)(secondRow,i);
-        (*this)(secondRow,i) = temp;
+void matrix::solveLinearEquation(int row,int firstElementPosition, double rhs, std::vector<double> &results) {
+    double leftSideSum = 0;
+    for (int i = cols - 2; i > firstElementPosition; --i) {
+        leftSideSum += (*this)(row, i)*results.at(cols-2-i);
     }
-}
 
-size_t matrix::row() const{
-    return rows;
-}
-
-size_t matrix::col() const{
-    return cols;
-}
-
-int matrix::rank() const{
-    int count = 0;
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols - 1; ++j) {
-            if((*this)(i,j) != 0){
-                count++;
-                break;
-            }
-        }
-    }
-    return count;
-}
-
-int matrix::rankOfExtendedMatrix() const{
-    int count = 0;
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            if((*this)(i,j) != 0){
-                count++;
-                break;
-            }
-        }
-    }
-    return count;
+    results.push_back((rhs-leftSideSum)/(*this)(row,firstElementPosition));
 }
 
 void matrix::countOneSolution() {
@@ -161,6 +197,7 @@ void matrix::countOneSolution() {
     for (int rowIndex = rows - 1; rowIndex >= 0; --rowIndex) {
 
         int pivotPosition = findPivotPosition(rowIndex);
+
         if(pivotPosition == -1){
             if(std::find(nonPivotPosition.begin(), nonPivotPosition.end(), rowIndex) != nonPivotPosition.end()) {
                 results.push_back(0);
@@ -168,15 +205,9 @@ void matrix::countOneSolution() {
             continue;
         }
 
+        double rhs = getRhs(rowIndex);
 
-        double rhs = (*this)(rowIndex,cols-1);
-
-        double leftSideSum = 0;
-        for (int i = cols - 2; i > pivotPosition; --i) {
-            leftSideSum += (*this)(rowIndex, i)*results.at(cols-2-i);
-        }
-
-        results.push_back((rhs-leftSideSum)/(*this)(rowIndex,pivotPosition));
+        solveLinearEquation(rowIndex,pivotPosition, rhs,results);
 
         if(std::find(nonPivotPosition.begin(), nonPivotPosition.end(), rowIndex) != nonPivotPosition.end()) {
             results.push_back(0);
@@ -195,12 +226,12 @@ void matrix::countOneSolution() {
 }
 
 
-void matrix::countKernel() {
-    std::cout << "+ span [";
+void matrix::countKernel(int numOfVectors) {
+    std::cout << " + span [";
 
     std::vector<int> nonPivotPosition = nonPositionOfPivots();
 
-    for (int kernelVectorCount = 0; kernelVectorCount < rows - rank(); ++kernelVectorCount) {
+    for (int kernelVectorCount = 0; kernelVectorCount < numOfVectors; ++kernelVectorCount) {
 
         std::vector<double> results;
         int emptySpacesCounter = 0;
@@ -222,12 +253,7 @@ void matrix::countKernel() {
 
             double rhs = 0;
 
-            double leftSideSum = 0;
-            for (int i = cols - 2; i > pivotPosition; --i) {
-                leftSideSum += (*this)(rowIndex, i) * results.at(cols - 2 - i);
-            }
-
-            results.push_back((rhs - leftSideSum) / (*this)(rowIndex, pivotPosition));
+            solveLinearEquation(rowIndex,pivotPosition, rhs,results);
 
             if (std::find(nonPivotPosition.begin(), nonPivotPosition.end(), rowIndex) != nonPivotPosition.end()) {
                 if(kernelVectorCount == emptySpacesCounter){
@@ -248,7 +274,7 @@ void matrix::countKernel() {
         }
         std::cout << ")";
     }
-    std::cout << "]";
+    std::cout << "]\n";
 
 }
 
@@ -276,6 +302,32 @@ int matrix::findPivotPosition(int rowIndex) const {
     }
     return -1;
 }
+
+int matrix::rank(int numOfCols) const{
+    int count = 0;
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < numOfCols; ++j) {
+            if((*this)(i,j) != 0){
+                count++;
+                break;
+            }
+        }
+    }
+    return count;
+}
+
+size_t matrix::row() const{
+    return rows;
+}
+
+size_t matrix::col() const{
+    return cols;
+}
+
+
+
+
+
 
 
 

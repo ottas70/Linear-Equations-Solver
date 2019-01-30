@@ -14,29 +14,39 @@ public:
 
     void solveMatrix();
 
+    void solveMatrixConcurrent();
+
     size_t col() const;
 
     size_t row() const;
 
+    double getRhs(int row) const;
+
 private:
+
+    double countKoeficient(int column, int row) const;
+
+    void multiplyAndSubstractRows(int startColumn, int row, double koeficient);
 
     int findPivotPosition(int rowIndex) const;
 
     void countOneSolution();
 
-    void countKernel();
+    void countKernel(int numOfVectors);
 
-    int rank() const;
-
-    int rankOfExtendedMatrix() const;
+    int rank(int numOfCols) const;
 
     void gaussElimination();
 
-    void swapRows(int firstRow, int secondRow);
+    void gaussEliminationConcurrent();
 
     void calculateValues();
 
     std::vector<int> nonPositionOfPivots();
+
+    void solveLinearEquation(int row, int firstElementPosition, double rhs, std::vector<double> &results);
+
+    void threadFunc(int col, int row);
 
 private:
 
