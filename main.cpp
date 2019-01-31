@@ -6,17 +6,6 @@ int main(int argc, char *argv[]) {
 
     cmdline cmd;
 
-    /****  TEMPORARY *****/
-    std::string filename2 = "/Users/ottovodvarka/Documents/Programming/CLionProjects/"
-                           "SemesterWork/LinearEquations/matrix_for_performance.txt";
-
-    cmd.sequentional(filename2);
-    cmd.parallel(filename2);
-
-    return 0;
-
-    /********************/
-
     std::string help = "--help";
     std::string sequence = "--sequence";
     std::string parallel = "--parallel";

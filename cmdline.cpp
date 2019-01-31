@@ -10,12 +10,13 @@ std::chrono::milliseconds to_ms(TimePoint tp) {
 }
 
 void cmdline::help() const {
-    std::cout << "Program ca have 2 arguments";
+    std::cout << "Program can have only 2 arguments at the same time\n";
     std::cout << "--help -> this menu\n"
                  "--sequence -> sequentional algorithm\n"
                  "--parallel -> parallel algorithm\n";
     std::cout << "Necessary argument is filename/path to text file with matrix.\n"
-                 "It can be only argument or third argument after selection of algorithm type.\n";
+                 "It can be the only argument or third argument after selection of algorithm type.\n"
+                 "Default setup uses sequentinal algorithm";
 }
 
 void cmdline::sequentional(std::string filename) const {
