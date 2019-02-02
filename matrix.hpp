@@ -44,7 +44,7 @@ private:
 
     std::vector<int> positionsOfPivots();
 
-    void solveLinearEquation(int row, int firstElementPosition, double rhs, double* results);
+    void solveLinearEquation(int row, int firstElementPosition, double rhs,std::vector<double> &results);
 
     void threadFunc(int col, int rowFrom, int rowTo);
 
@@ -52,7 +52,7 @@ private:
 
     void partialPivoting(int col);
 
-    void fillNonPivotPositions(double* results, std::vector<int> pivotsColumns, int kernelCount);
+    void fillNonPivotPositions(std::vector<double> &results, std::vector<int> pivotsColumns, int kernelCount);
 
 private:
 

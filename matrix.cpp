@@ -3,6 +3,7 @@
 #include <cmath>
 #include <algorithm>
 #include <thread>
+#include <vector>
 
 matrix::matrix(size_t row, size_t column, std::unique_ptr<double[]> matrix) {
     rows = row;
@@ -189,7 +190,7 @@ void matrix::multiplyAndSubstractRows(int startColumn, int row, double koeficien
 }
 
 void matrix::calculateValues() {
-    double results[cols - 1];
+    std::vector<double> results(cols-1);
 
     //počítám od posledního řádku(rovnice)
     for (int rowIndex = rows - 1; rowIndex >= 0; --rowIndex) {
@@ -201,14 +202,14 @@ void matrix::calculateValues() {
     }
 
     std::cout << "Result is vector (";
-    for (double d : results) {
-        std::cout << " " << d << " ";
+    for (int i = 0; i < results.capacity(); ++i) {
+        std::cout << " " << results[i] << " ";
     }
     std::cout << ")\n";
 
 }
 
-void matrix::solveLinearEquation(int row, int firstElementPosition, double rhs, double* results) {
+void matrix::solveLinearEquation(int row, int firstElementPosition, double rhs, std::vector<double> &results) {
     double leftSideSum = 0;
     for (int i = cols - 2; i > firstElementPosition; --i) {
         leftSideSum += (*this)(row, i) * results[i];
@@ -218,7 +219,7 @@ void matrix::solveLinearEquation(int row, int firstElementPosition, double rhs, 
 }
 
 void matrix::countOneSolution() {
-    double results[cols-1];
+    std::vector<double> results(cols-1);
     std::vector<int> pivots = positionsOfPivots();
 
     fillNonPivotPositions(results, pivots, -1);
@@ -238,8 +239,8 @@ void matrix::countOneSolution() {
     }
 
     std::cout << "(";
-    for (double d : results) {
-        std::cout << " " << d << " ";
+    for (int i = 0; i < results.capacity(); ++i) {
+        std::cout << " " << results[i] << " ";
     }
     std::cout << ")";
 
@@ -252,7 +253,7 @@ void matrix::countKernel(int numOfVectors) {
 
     for (int kernelVectorCount = 0; kernelVectorCount < numOfVectors; ++kernelVectorCount) {
 
-        double results[cols - 1];
+        std::vector<double> results(cols-1);
 
         fillNonPivotPositions(results, pivots, kernelVectorCount);
 
@@ -270,8 +271,8 @@ void matrix::countKernel(int numOfVectors) {
         }
 
         std::cout << "(";
-        for (double d : results) {
-            std::cout << " " << d << " ";
+        for (int i = 0; i < results.capacity(); ++i) {
+            std::cout << " " << results[i] << " ";
         }
         std::cout << ")";
     }
@@ -279,7 +280,7 @@ void matrix::countKernel(int numOfVectors) {
 
 }
 
-void matrix::fillNonPivotPositions(double* results, std::vector<int> pivotsColumns, int kernelCount) {
+void matrix::fillNonPivotPositions(std::vector<double> &results, std::vector<int> pivotsColumns, int kernelCount) {
     int kernelCounter = 0;
     for (int i = 0; i < cols - 1; ++i) {
         if(std::find(pivotsColumns.begin(), pivotsColumns.end(), i) == pivotsColumns.end()){
