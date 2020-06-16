@@ -1,7 +1,5 @@
 ## Řešení soustav lineárních rovnic
 
-Semestrální práce na předmět PJC.
-
 ### Popis
 
 Tento program slouží k výpočtu soustav lineárních
